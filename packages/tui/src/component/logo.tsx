@@ -35,24 +35,24 @@ type ShimmerConfig = {
 
 const shimmerConfig: ShimmerConfig = {
   period: 4600,
-  rings: 2,
+  rings: 1,
   sweepFraction: 1,
   coreWidth: 1.2,
-  coreAmp: 1.9,
+  coreAmp: 1.35,
   softWidth: 10,
-  softAmp: 1.6,
+  softAmp: 1.05,
   tail: 5,
-  tailAmp: 0.64,
+  tailAmp: 0.42,
   haloWidth: 4.3,
   haloOffset: 0.6,
-  haloAmp: 0.16,
+  haloAmp: 0.09,
   breathBase: 0.04,
-  noise: 0.1,
-  ambientAmp: 0.36,
+  noise: 0.04,
+  ambientAmp: 0.2,
   ambientCenter: 0.5,
   ambientWidth: 0.34,
   shadowMix: 0.1,
-  primaryMix: 0.3,
+  primaryMix: 0.2,
   originX: 4.5,
   originY: 13.5,
 }
@@ -63,25 +63,25 @@ const shimmerConfig: ShimmerConfig = {
 // ~ = shadow top only (▀ with fg=shadow)
 const GAP = 1
 const WIDTH = 0.76
-const GAIN = 2.3
-const FLASH = 2.15
-const TRAIL = 0.28
-const SWELL = 0.24
-const WIDE = 1.85
-const DRIFT = 1.45
+const GAIN = 1.55
+const FLASH = 1.15
+const TRAIL = 0.18
+const SWELL = 0.14
+const WIDE = 1.5
+const DRIFT = 1.2
 const EXPAND = 1.62
 const LIFE = 1020
 const CHARGE = 3000
 const HOLD = 90
 const SINK = 40
-const ARC = 2.2
-const FORK = 1.2
-const DIM = 1.04
-const KICK = 0.86
+const ARC = 1.25
+const FORK = 0.7
+const DIM = 0.72
+const KICK = 0.5
 const LAG = 60
-const SUCK = 0.34
+const SUCK = 0.18
 const SHIMMER_IN = 60
-const SHIMMER_OUT = 2.8
+const SHIMMER_OUT = 2.2
 const TRACE = 0.033
 const TAIL = 1.8
 const TRACE_IN = 200
@@ -144,6 +144,11 @@ type Trace = {
   l: number
 }
 
+type PaintedChar = {
+  char: string
+  muted: boolean
+}
+
 function clamp(n: number) {
   return Math.max(0, Math.min(1, n))
 }
@@ -191,6 +196,26 @@ function noise(x: number, y: number, t: number) {
 
 function lit(char: string) {
   return char !== " " && char !== "_" && char !== "~" && char !== ","
+}
+
+function decode(line: string) {
+  const parts = [] as PaintedChar[]
+  let muted = false
+  for (let i = 0; i < line.length; i++) {
+    if (line[i] === "-" && line[i + 1] === "-") {
+      muted = !muted
+      i++
+      continue
+    }
+    parts.push({ char: line[i], muted })
+  }
+  return parts
+}
+
+function clean(line: string) {
+  return decode(line)
+    .map((item) => item.char)
+    .join("")
 }
 
 function key(x: number, y: number) {
@@ -296,8 +321,10 @@ type LogoContext = {
 }
 
 function build(shape: LogoShape): LogoContext {
-  const LEFT = shape.left[0]?.length ?? 0
-  const FULL = shape.left.map((line, i) => line + " ".repeat(GAP) + shape.right[i])
+  const left = shape.left.map(clean)
+  const right = shape.right.map(clean)
+  const LEFT = left[0]?.length ?? 0
+  const FULL = left.map((line, i) => line + " ".repeat(GAP) + (right[i] ?? ""))
   const SPAN = Math.hypot(FULL[0]?.length ?? 0, FULL.length * 2) * 0.94
   return { LEFT, FULL, SPAN, MAP: mapGlyphs(FULL), shape }
 }
@@ -384,10 +411,10 @@ function field(x: number, y: number, frame: Frame, ctx: LogoContext) {
   const seam = Math.max(0, Math.cos(angle * 5 + spin * 1.55)) ** 12
   const ring = Math.exp(-(((dist - lerp(1.05, 3, level)) / 0.48) ** 2)) * arc * lerp(0.03, 0.5 + ARC, storm)
   const fork = Math.exp(-(((dist - (1.55 + storm * 2.1)) / 0.36) ** 2)) * seam * storm * FORK
-  const spark = Math.max(0, noise(x, y, frame.t) - lerp(0.94, 0.66, storm)) * lerp(0, 5.4, storm)
-  const glitch = spark * Math.exp(-dist / Math.max(1.2, 3.1 - storm))
+  const spark = Math.max(0, noise(x, y, frame.t) - lerp(0.94, 0.66, storm)) * lerp(0, 3.2, storm)
+  const glitch = spark * Math.exp(-dist / Math.max(1.2, 3.1 - storm)) * 0.7
   const crack = Math.max(0, Math.cos((dx - dy) * 1.6 + spin * 2.1)) ** 18
-  const lash = crack * Math.exp(-(((dist - (1.95 + storm * 2)) / 0.28) ** 2)) * storm * 1.1
+  const lash = crack * Math.exp(-(((dist - (1.95 + storm * 2)) / 0.28) ** 2)) * storm * 0.65
   const flicker =
     Math.max(0, noise(item.x * 3.1, item.y * 2.7, frame.t * 1.7) - 0.72) *
     Math.exp(-(dist * dist) / 0.15) *
@@ -455,8 +482,8 @@ function idle(
   const angle = Math.atan2(dy, dx)
   const wob1 = noise(x * 0.32, pixelY * 0.25, frame.t * 0.0005) - 0.5
   const wob2 = noise(x * 0.12, pixelY * 0.08, frame.t * 0.00022) - 0.5
-  const ripple = Math.sin(angle * 3 + frame.t * 0.0012) * 0.3
-  const jitter = (wob1 * 0.55 + wob2 * 0.32 + ripple * 0.18) * cfg.noise
+  const ripple = Math.sin(angle * 3 + frame.t * 0.0012) * 0.14
+  const jitter = (wob1 * 0.3 + wob2 * 0.18 + ripple * 0.1) * cfg.noise
   const traveled = dist + jitter
   let glow = 0
   let peak = 0
@@ -687,13 +714,15 @@ export function Logo(props: { shape?: LogoShape; ink?: RGBA; idle?: boolean } = 
     dusk: Frame,
     state: IdleState | undefined,
   ): JSX.Element[] => {
-    const shadow = tint(theme.background, ink, 0.25)
     const attrs = bold ? TextAttributes.BOLD : undefined
 
-    return Array.from(line).map((char, i) => {
+    return decode(line).map(({ char, muted }, i) => {
+      const baseInk = muted ? tint(theme.background, theme.text, 0.62) : ink
+      const shadow = tint(theme.background, baseInk, 0.25)
+
       if (char === " ") {
         return (
-          <text fg={ink} attributes={attrs} selectable={false}>
+          <text fg={baseInk} attributes={attrs} selectable={false}>
             {char}
           </text>
         )
@@ -710,8 +739,8 @@ export function Logo(props: { shape?: LogoShape; ink?: RGBA; idle?: boolean } = 
       const primaryMixBot = charLit ? Math.min(1, pulseBot.primary) : 0
       // Layer primary tint first, then white peak on top — so the halo/tail pulls toward primary,
       // while the bright core stays pure white
-      const inkTopTint = primaryMixTop > 0 ? tint(ink, theme.primary, primaryMixTop) : ink
-      const inkBotTint = primaryMixBot > 0 ? tint(ink, theme.primary, primaryMixBot) : ink
+      const inkTopTint = primaryMixTop > 0 ? tint(baseInk, theme.primary, primaryMixTop) : baseInk
+      const inkBotTint = primaryMixBot > 0 ? tint(baseInk, theme.primary, primaryMixBot) : baseInk
       const inkTop = peakMixTop > 0 ? tint(inkTopTint, PEAK, peakMixTop) : inkTopTint
       const inkBot = peakMixBot > 0 ? tint(inkBotTint, PEAK, peakMixBot) : inkBotTint
       // For the non-peak-aware brightness channels, use the average of top/bot
@@ -722,7 +751,7 @@ export function Logo(props: { shape?: LogoShape; ink?: RGBA; idle?: boolean } = 
       }
       const peakMix = charLit ? Math.min(1, pulse.peak) : 0
       const primaryMix = charLit ? Math.min(1, pulse.primary) : 0
-      const inkPrimary = primaryMix > 0 ? tint(ink, theme.primary, primaryMix) : ink
+      const inkPrimary = primaryMix > 0 ? tint(baseInk, theme.primary, primaryMix) : baseInk
       const inkTinted = peakMix > 0 ? tint(inkPrimary, PEAK, peakMix) : inkPrimary
       const shadowMixCfg = state?.cfg.shadowMix ?? shimmerConfig.shadowMix
       const shadowMixTop = Math.min(1, pulseTop.peak * shadowMixCfg)
@@ -741,7 +770,7 @@ export function Logo(props: { shape?: LogoShape; ink?: RGBA; idle?: boolean } = 
       if (char === "_") {
         return (
           <text
-            fg={shade(inkTinted, theme, s * 0.08)}
+              fg={shade(inkTinted, theme, s * 0.08)}
             bg={shade(shadowTinted, theme, ghost(s, 0.24) + ghost(q, 0.06))}
             attributes={attrs}
             selectable={false}
@@ -754,7 +783,7 @@ export function Logo(props: { shape?: LogoShape; ink?: RGBA; idle?: boolean } = 
       if (char === "^") {
         return (
           <text
-            fg={shade(inkTop, theme, n + p + e + b)}
+              fg={shade(inkTop, theme, n + p + e + b)}
             bg={shade(shadowBot, theme, ghost(s, 0.18) + ghost(q, 0.05) + ghost(b, 0.08))}
             attributes={attrs}
             selectable={false}
@@ -766,7 +795,7 @@ export function Logo(props: { shape?: LogoShape; ink?: RGBA; idle?: boolean } = 
 
       if (char === "~") {
         return (
-          <text fg={shade(shadowTop, theme, ghost(s, 0.22) + ghost(q, 0.05))} attributes={attrs} selectable={false}>
+            <text fg={shade(shadowTop, theme, ghost(s, 0.22) + ghost(q, 0.05))} attributes={attrs} selectable={false}>
             ▀
           </text>
         )
