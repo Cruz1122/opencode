@@ -1,6 +1,7 @@
-import type { AssistantMessage, Part, Provider, UserMessage } from "@opencode-ai/sdk/v2"
+import type { AssistantMessage, Message, Part, Provider, UserMessage } from "@opencode-ai/sdk/v2"
 import { Locale } from "./locale"
 import * as Model from "./model"
+import { aggregateTokens, formatTokenStats, turnAssistants } from "./message-tokens"
 
 export type TranscriptOptions = {
   thinking: boolean
@@ -36,7 +37,7 @@ export function formatTranscript(
   transcript += `---\n\n`
 
   for (const msg of messages) {
-    transcript += formatMessage(msg.info, msg.parts, options, providers)
+    transcript += formatMessage(msg.info, msg.parts, options, providers, messages.map((item) => item.info))
     transcript += `---\n\n`
   }
 
@@ -48,13 +49,14 @@ export function formatMessage(
   parts: Part[],
   options: TranscriptOptions,
   providers?: Provider[] | ReadonlyMap<string, Provider>,
+  messages?: Message[],
 ): string {
   let result = ""
 
   if (msg.role === "user") {
     result += `## User\n\n`
   } else {
-    result += formatAssistantHeader(msg, options.assistantMetadata, providers ?? options.providers)
+    result += formatAssistantHeader(msg, options.assistantMetadata, providers ?? options.providers, messages)
   }
 
   for (const part of parts) {
@@ -68,17 +70,32 @@ export function formatAssistantHeader(
   msg: AssistantMessage,
   includeMetadata: boolean,
   providers?: Provider[] | ReadonlyMap<string, Provider>,
+  messages?: Message[],
 ): string {
   if (!includeMetadata) {
     return `## Assistant\n\n`
   }
 
-  const duration =
-    msg.time.completed && msg.time.created ? ((msg.time.completed - msg.time.created) / 1000).toFixed(1) + "s" : ""
+  const user = messages?.find((item) => item.role === "user" && item.id === msg.parentID)
+  const durationMs =
+    user?.time && msg.time.completed ? msg.time.completed - user.time.created : msg.time.completed
+      ? msg.time.completed - msg.time.created
+      : 0
 
   const modelName = Model.name(providers, msg.providerID, msg.modelID)
+  const parts = [`${Locale.titlecase(msg.agent)} · ${modelName}`]
+  if (durationMs > 0) parts.push(Locale.duration(durationMs))
 
-  return `## Assistant (${Locale.titlecase(msg.agent)} · ${modelName}${duration ? ` · ${duration}` : ""})\n\n`
+  const showTokenStats =
+    msg.time.completed &&
+    ((msg.finish && !["tool-calls", "unknown"].includes(msg.finish)) || msg.error?.name === "MessageAbortedError")
+  if (showTokenStats && durationMs > 0) {
+    const assistants = messages ? turnAssistants(messages, msg.parentID) : [msg]
+    const stats = formatTokenStats(aggregateTokens(assistants), durationMs)
+    if (stats) parts.push(stats)
+  }
+
+  return `## Assistant (${parts.join(" · ")})\n\n`
 }
 
 export function formatPart(part: Part, options: TranscriptOptions): string {

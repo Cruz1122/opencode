@@ -104,6 +104,27 @@ describe("transcript", () => {
       const result = formatAssistantHeader(msg, true)
       expect(result).toContain("Plan")
     })
+
+    test("includes token stats for completed turns", () => {
+      const msg = {
+        ...baseMsg,
+        finish: "stop",
+        tokens: { input: 6000, output: 1500, reasoning: 0, cache: { read: 400, write: 100 } },
+        time: { created: 1000000, completed: 1010000 },
+      }
+      const user: UserMessage = {
+        id: "msg_parent",
+        sessionID: "ses_123",
+        role: "user",
+        time: { created: 1000000 },
+        agent: "build",
+        model: { providerID: "anthropic", modelID: "claude-sonnet-4-20250514" },
+      }
+      const result = formatAssistantHeader(msg, true, providers, [user, msg])
+      expect(result).toContain("10.0s")
+      expect(result).toContain("150 T/s")
+      expect(result).toContain("8.0K tokens ↓ 6.0K, ↑ 1.5K, ◈ 400/100")
+    })
   })
 
   describe("formatPart", () => {
@@ -344,7 +365,7 @@ describe("transcript", () => {
       expect(result).toContain("**Session ID:** ses_abc123")
       expect(result).toContain("## User")
       expect(result).toContain("Hello")
-      expect(result).toContain("## Assistant (Build · Claude Sonnet 4 · 0.5s)")
+      expect(result).toContain("## Assistant (Build · Claude Sonnet 4 · 600ms)")
       expect(result).toContain("Hi!")
       expect(result).toContain("---")
     })
@@ -381,7 +402,7 @@ describe("transcript", () => {
         assistantMetadata: true,
       })
 
-      expect(result).toContain("## Assistant (Build · claude-sonnet-4-20250514 · 0.5s)")
+      expect(result).toContain("## Assistant (Build · claude-sonnet-4-20250514 · 500ms)")
     })
 
     test("formats transcript without assistant metadata", () => {

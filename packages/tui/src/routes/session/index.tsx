@@ -39,6 +39,7 @@ import type {
 } from "@opencode-ai/sdk/v2"
 import { useLocal } from "../../context/local"
 import { Locale } from "../../util/locale"
+import { aggregateTokens, buildTokenStats, formatTokenDetail, turnAssistants } from "../../util/message-tokens"
 import { webSearchProviderLabel } from "../../util/tool-display"
 import { useRenderer, useTerminalDimensions, type JSX } from "@opentui/solid"
 import { useSDK } from "../../context/sdk"
@@ -1485,6 +1486,18 @@ function AssistantMessage(props: { message: AssistantMessage; parts: Part[]; las
     return props.message.time.completed - user.time.created
   })
 
+  const tokenStats = createMemo(() => {
+    if (!props.message.time.completed) return
+    const durationMs = duration()
+    if (durationMs <= 0) return
+    return buildTokenStats(
+      aggregateTokens(turnAssistants(messages(), props.message.parentID)),
+      durationMs,
+    )
+  })
+
+  const agentColor = createMemo(() => local.agent.color(props.message.agent))
+
   const childShortcut = useCommandShortcut("session.child.first")
   const backgroundShortcut = useCommandShortcut("session.background")
 
@@ -1550,7 +1563,7 @@ function AssistantMessage(props: { message: AssistantMessage; parts: Part[]; las
                   fg:
                     props.message.error?.name === "MessageAbortedError"
                       ? theme.textMuted
-                      : local.agent.color(props.message.agent),
+                      : agentColor(),
                 }}
               >
                 ▣{" "}
@@ -1559,6 +1572,13 @@ function AssistantMessage(props: { message: AssistantMessage; parts: Part[]; las
               <span style={{ fg: theme.textMuted }}> · {model()}</span>
               <Show when={duration()}>
                 <span style={{ fg: theme.textMuted }}> · {Locale.duration(duration())}</span>
+              </Show>
+              <Show when={tokenStats()?.rate !== undefined}>
+                <span style={{ fg: theme.textMuted }}> · </span>
+                <span style={{ fg: agentColor() }}>{tokenStats()!.rate} T/s</span>
+              </Show>
+              <Show when={tokenStats()}>
+                <span style={{ fg: theme.textMuted }}> · {formatTokenDetail(tokenStats()!)}</span>
               </Show>
               <Show when={props.message.error?.name === "MessageAbortedError"}>
                 <span style={{ fg: theme.textMuted }}> · interrupted</span>
