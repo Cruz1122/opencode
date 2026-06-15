@@ -14,6 +14,7 @@ import "opentui-spinner/solid"
 import path from "path"
 import { fileURLToPath } from "url"
 import { useLocal } from "../../context/local"
+import { useAutopilot } from "../../context/autopilot"
 import { Flag } from "@opencode-ai/core/flag/flag"
 import { tint, useTheme } from "../../context/theme"
 import { EmptyBorder, SplitBorder } from "../../ui/border"
@@ -144,6 +145,7 @@ export function Prompt(props: PromptProps) {
 
   const leader = useLeaderActive()
   const local = useLocal()
+  const autopilot = useAutopilot()
   const args = useArgs()
   const paths = useTuiPaths()
   const terminalEnvironment = useTuiTerminalEnvironment()
@@ -573,6 +575,12 @@ export function Prompt(props: PromptProps) {
     ]),
   }))
 
+  useBindings(() => ({
+    target: inputTarget,
+    enabled: inputTarget() !== undefined && !props.disabled && store.mode === "normal",
+    bindings: tuiConfig.keybinds.gather("prompt.autopilot", ["session.toggle.autopilot"]),
+  }))
+
   const ref: PromptRef = {
     get focused() {
       return input.focused
@@ -1000,6 +1008,7 @@ export function Prompt(props: PromptProps) {
           id: selectedModel.modelID,
           variant,
         },
+        metadata: autopilot.metadataForCreate(),
       })
 
       if (res.error) {
@@ -1300,6 +1309,11 @@ export function Prompt(props: PromptProps) {
     () => !!local.agent.current() && store.mode === "normal" && showVariant(),
     animationsEnabled,
   )
+  const showAutopilot = autopilot.enabledMemo(() => props.sessionID)
+  const autopilotMetaAlpha = createFadeIn(
+    () => (props.sessionID ? !!local.agent.current() : true) && store.mode === "normal" && showAutopilot(),
+    animationsEnabled,
+  )
   const borderHighlight = createMemo(() => tint(theme.border, highlight(), agentMetaAlpha()))
 
   const placeholderText = createMemo(() => {
@@ -1456,6 +1470,14 @@ export function Prompt(props: PromptProps) {
                             <text>
                               <span style={{ fg: fadeColor(theme.warning, variantMetaAlpha()), bold: true }}>
                                 {local.model.variant.current()}
+                              </span>
+                            </text>
+                          </Show>
+                          <Show when={props.sessionID && showAutopilot()}>
+                            <text fg={fadeColor(theme.textMuted, autopilotMetaAlpha())}>·</text>
+                            <text>
+                              <span style={{ fg: fadeColor(theme.error, autopilotMetaAlpha()), bold: true }}>
+                                Autopilot
                               </span>
                             </text>
                           </Show>

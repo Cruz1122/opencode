@@ -4,6 +4,7 @@ import { createMemo, Match, Show, Switch } from "solid-js"
 import { abbreviateHome } from "../../runtime"
 import { useTuiPaths } from "../../context/runtime"
 import { useHomeSessionDestination } from "../../routes/home/session-destination"
+import { useAutopilot } from "../../context/autopilot"
 
 const id = "internal:home-footer"
 
@@ -51,6 +52,19 @@ function Mcp(props: { api: TuiPluginApi }) {
   )
 }
 
+function Autopilot(props: { api: TuiPluginApi }) {
+  const theme = () => props.api.theme.current
+  const autopilot = useAutopilot()
+
+  return (
+    <Show when={autopilot.directoryActive()}>
+      <text fg={theme().error}>
+        <span style={{ fg: theme().error }}>⊙</span> Autopilot
+      </text>
+    </Show>
+  )
+}
+
 function Version(props: { api: TuiPluginApi }) {
   const theme = () => props.api.theme.current
 
@@ -74,6 +88,7 @@ function View(props: { api: TuiPluginApi }) {
       gap={2}
     >
       <Directory api={props.api} />
+      <Autopilot api={props.api} />
       <Mcp api={props.api} />
       <box flexGrow={1} />
       <Version api={props.api} />

@@ -5,17 +5,23 @@ import { useDirectory } from "../../context/directory"
 import { useConnected } from "../../component/use-connected"
 import { createStore } from "solid-js/store"
 import { useRoute } from "../../context/route"
+import { useAutopilot } from "../../context/autopilot"
 
 export function Footer() {
   const { theme } = useTheme()
   const sync = useSync()
   const route = useRoute()
+  const autopilot = useAutopilot()
   const mcp = createMemo(() => Object.values(sync.data.mcp).filter((x) => x.status === "connected").length)
   const mcpError = createMemo(() => Object.values(sync.data.mcp).some((x) => x.status === "failed"))
   const lsp = createMemo(() => Object.keys(sync.data.lsp))
   const permissions = createMemo(() => {
     if (route.data.type !== "session") return []
     return sync.data.permission[route.data.sessionID] ?? []
+  })
+  const autopilotActive = createMemo(() => {
+    if (route.data.type !== "session") return false
+    return autopilot.enabled(route.data.sessionID)
   })
   const directory = useDirectory()
   const connected = useConnected()
@@ -60,6 +66,11 @@ export function Footer() {
             </text>
           </Match>
           <Match when={connected()}>
+            <Show when={autopilotActive()}>
+              <text fg={theme.error}>
+                <span style={{ fg: theme.error }}>⊙</span> Autopilot
+              </text>
+            </Show>
             <Show when={permissions().length > 0}>
               <text fg={theme.warning}>
                 <span style={{ fg: theme.warning }}>△</span> {permissions().length} Permission

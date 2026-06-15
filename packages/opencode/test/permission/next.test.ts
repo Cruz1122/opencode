@@ -1,4 +1,5 @@
 import { PermissionV1 } from "@opencode-ai/core/v1/permission"
+import { ProjectV2 } from "@opencode-ai/core/project"
 import { test, expect } from "bun:test"
 import os from "os"
 import { Cause, Deferred, Effect, Exit, Fiber, Layer } from "effect"
@@ -6,21 +7,81 @@ import { EventV2Bridge } from "../../src/event-v2-bridge"
 import { CrossSpawnSpawner } from "@opencode-ai/core/cross-spawn-spawner"
 import { Database } from "@opencode-ai/core/database/database"
 import { Permission } from "../../src/permission"
+import { Session } from "../../src/session/session"
 import { InstanceBootstrap } from "../../src/project/bootstrap-service"
 import { InstanceStore } from "../../src/project/instance-store"
+import { NotFoundError } from "../../src/storage/storage"
 import { TestInstance, tmpdirScoped } from "../fixture/fixture"
 import { testEffect } from "../lib/effect"
 import { MessageID, SessionID } from "../../src/session/schema"
 
 const events = EventV2Bridge.defaultLayer
 const noopBootstrap = Layer.succeed(InstanceBootstrap.Service, InstanceBootstrap.Service.of({ run: Effect.void }))
+const sessionNotFound = Layer.mock(Session.Service, {
+  get: () => Effect.fail(new NotFoundError({ message: "Session not found" })),
+})
 const env = Layer.mergeAll(
-  Permission.layer.pipe(Layer.provide(Database.defaultLayer), Layer.provide(events)),
+  Permission.layer.pipe(
+    Layer.provide(Database.defaultLayer),
+    Layer.provide(events),
+    Layer.provide(sessionNotFound),
+  ),
   events,
   CrossSpawnSpawner.defaultLayer,
   InstanceStore.defaultLayer.pipe(Layer.provide(noopBootstrap)),
 )
 const it = testEffect(env)
+
+function sessionInfo(input: {
+  id: string
+  metadata?: Session.Info["metadata"]
+  parentID?: string
+}): Session.Info {
+  return {
+    id: SessionID.make(input.id),
+    slug: input.id,
+    projectID: ProjectV2.ID.make("project_test"),
+    directory: "/tmp",
+    title: "test",
+    version: "1",
+    time: { created: 0, updated: 0 },
+    metadata: input.metadata,
+    parentID: input.parentID ? SessionID.make(input.parentID) : undefined,
+  }
+}
+
+function sessionEnv(sessions: Record<string, Session.Info>) {
+  return Layer.mergeAll(
+    Permission.layer.pipe(
+      Layer.provide(Database.defaultLayer),
+      Layer.provide(events),
+      Layer.provide(
+        Layer.mock(Session.Service, {
+          get: (id) => {
+            const session = sessions[id]
+            if (!session) return Effect.fail(new NotFoundError({ message: `Session not found: ${id}` }))
+            return Effect.succeed(session)
+          },
+        }),
+      ),
+    ),
+    events,
+    CrossSpawnSpawner.defaultLayer,
+    InstanceStore.defaultLayer.pipe(Layer.provide(noopBootstrap)),
+  )
+}
+
+const autopilotDenyIt = testEffect(
+  sessionEnv({
+    session_autopilot: sessionInfo({ id: "session_autopilot", metadata: { autopilot: true } }),
+  }),
+)
+const autopilotParentIt = testEffect(
+  sessionEnv({
+    session_child: sessionInfo({ id: "session_child", parentID: "session_parent" }),
+    session_parent: sessionInfo({ id: "session_parent", metadata: { autopilot: true } }),
+  }),
+)
 
 const rejectAll = (message?: string) =>
   Effect.gen(function* () {
@@ -591,6 +652,34 @@ it.instance(
       expect(err).toBeInstanceOf(PermissionV1.DeniedError)
     }),
   { git: true },
+)
+
+autopilotDenyIt.effect("ask - bypasses deny when session autopilot is enabled", () =>
+  Effect.gen(function* () {
+    const result = yield* ask({
+      sessionID: SessionID.make("session_autopilot"),
+      permission: "bash",
+      patterns: ["rm -rf /"],
+      metadata: {},
+      always: [],
+      ruleset: [{ permission: "bash", pattern: "*", action: "deny" }],
+    })
+    expect(result).toBeUndefined()
+  }),
+)
+
+autopilotParentIt.effect("ask - inherits autopilot from parent session", () =>
+  Effect.gen(function* () {
+    const result = yield* ask({
+      sessionID: SessionID.make("session_child"),
+      permission: "edit",
+      patterns: ["foo.ts"],
+      metadata: {},
+      always: [],
+      ruleset: [{ permission: "edit", pattern: "*", action: "deny" }],
+    })
+    expect(result).toBeUndefined()
+  }),
 )
 
 it.instance(

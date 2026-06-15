@@ -36,6 +36,7 @@ import { StartupLoading } from "./component/startup-loading"
 import { SyncProvider, useSync } from "./context/sync"
 import { DataProvider } from "./context/data"
 import { LocalProvider, useLocal } from "./context/local"
+import { AutopilotProvider, useAutopilot } from "./context/autopilot"
 import { DialogModel } from "./component/dialog-model"
 import { useConnected } from "./component/use-connected"
 import { DialogMcp } from "./component/dialog-mcp"
@@ -108,6 +109,7 @@ const appBindingCommands = [
   "mcp.list",
   "agent.cycle",
   "agent.cycle.reverse",
+  "session.toggle.autopilot",
   "variant.cycle",
   "variant.list",
   "provider.connect",
@@ -297,7 +299,8 @@ export const run = Effect.fn("Tui.run")(function* (input: TuiInput) {
                                               <DataProvider>
                                                 <ThemeProvider mode={mode}>
                                                   <LocalProvider>
-                                                    <PromptStashProvider>
+                                                    <AutopilotProvider>
+                                                      <PromptStashProvider>
                                                       <DialogProvider>
                                                         <FrecencyProvider>
                                                           <PromptHistoryProvider>
@@ -313,6 +316,7 @@ export const run = Effect.fn("Tui.run")(function* (input: TuiInput) {
                                                         </FrecencyProvider>
                                                       </DialogProvider>
                                                     </PromptStashProvider>
+                                                    </AutopilotProvider>
                                                   </LocalProvider>
                                                 </ThemeProvider>
                                               </DataProvider>
@@ -365,6 +369,7 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
   const { theme, mode, setMode, locked, lock, unlock } = themeState
   const sync = useSync()
   const project = useProject()
+  const autopilot = useAutopilot()
   const exit = useExit()
   const promptRef = usePromptRef()
   const pluginRuntime = usePluginRuntime()
@@ -719,6 +724,19 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
         hidden: true,
         run: () => {
           local.agent.move(-1)
+        },
+      },
+      {
+        name: "session.toggle.autopilot",
+        title: "Toggle autopilot",
+        category: "Session",
+        hidden: true,
+        slashName: "autopilot",
+        slashAliases: ["toggle-autopilot"],
+        run: () => {
+          if (route.data.type === "session") autopilot.toggleCurrent(route.data.sessionID)
+          else if (route.data.type === "home") autopilot.toggleCurrent()
+          dialog.clear()
         },
       },
       {
