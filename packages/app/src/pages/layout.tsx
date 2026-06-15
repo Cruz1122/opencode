@@ -52,6 +52,7 @@ import { usePermission } from "@/context/permission"
 import { Binary } from "@opencode-ai/core/util/binary"
 import { retry } from "@opencode-ai/core/util/retry"
 import { playSoundById } from "@/utils/sound"
+import { shouldPlayAttentionSound } from "@/utils/attention"
 import { createAim } from "@/utils/aim"
 import { setNavigate } from "@/utils/notification-click"
 import { Worktree as WorktreeState } from "@/utils/worktree"
@@ -452,8 +453,21 @@ export default function Layout(props: ParentProps) {
         if (now - lastAlerted < cooldownMs) return
         alertedAtBySession.set(sessionKey, now)
 
+        const currentSession = params.id
+        const viewing =
+          pathKey(directory) === pathKey(currentDir()) &&
+          (props.sessionID === currentSession || session?.parentID === currentSession)
+        const playSound = shouldPlayAttentionSound({
+          directory,
+          sessionID: props.sessionID,
+          parentID: session?.parentID,
+          currentDirectory: currentDir(),
+          currentSession,
+          directoryKey: pathKey,
+        })
+
         if (e.details.type === "permission.asked") {
-          if (settings.sounds.permissionsEnabled()) {
+          if (playSound && settings.sounds.permissionsEnabled()) {
             void playSoundById(settings.sounds.permissions())
           }
           if (settings.notifications.permissions()) {
@@ -462,14 +476,15 @@ export default function Layout(props: ParentProps) {
         }
 
         if (e.details.type === "question.asked") {
+          if (playSound && settings.sounds.agentEnabled()) {
+            void playSoundById(settings.sounds.agent())
+          }
           if (settings.notifications.agent()) {
             void platform.notify(title, description, href)
           }
         }
 
-        const currentSession = params.id
-        if (pathKey(directory) === pathKey(currentDir()) && props.sessionID === currentSession) return
-        if (pathKey(directory) === pathKey(currentDir()) && session?.parentID === currentSession) return
+        if (viewing) return
 
         dismissSessionAlert(sessionKey)
 

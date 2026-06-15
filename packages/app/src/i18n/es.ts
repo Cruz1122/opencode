@@ -737,6 +737,14 @@ export const dict = {
     "Mostrar notificación del sistema cuando se requiera un permiso",
   "settings.general.notifications.errors.title": "Errores",
   "settings.general.notifications.errors.description": "Mostrar notificación del sistema cuando ocurra un error",
+  "settings.general.notifications.permission.title": "Permiso del sistema",
+  "settings.general.notifications.permission.default":
+    "Permite las notificaciones del sistema para recibir alertas cuando OpenCode esté en segundo plano",
+  "settings.general.notifications.permission.denied":
+    "Las notificaciones del sistema están bloqueadas. Actívalas en la configuración del navegador o del sistema operativo.",
+  "settings.general.notifications.permission.unsupported":
+    "Las notificaciones del sistema no están disponibles en este entorno",
+  "settings.general.notifications.permission.request": "Permitir notificaciones",
 
   "settings.general.sounds.agent.title": "Agente",
   "settings.general.sounds.agent.description": "Reproducir sonido cuando el agente termine o necesite atención",

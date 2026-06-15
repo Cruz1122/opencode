@@ -6,14 +6,26 @@ const id = "internal:notifications"
 
 type SessionError = Extract<Event, { type: "session.error" }>["properties"]["error"]
 
+function isViewingSession(api: TuiPluginApi, sessionID: string | undefined) {
+  if (!sessionID) return false
+  const route = api.route.current
+  if (route.name !== "session") return false
+  const currentID = route.params?.sessionID
+  if (typeof currentID !== "string") return false
+  if (currentID === sessionID) return true
+  const session = api.state.session.get(sessionID)
+  return session?.parentID === currentID
+}
+
 function notify(api: TuiPluginApi, sessionID: string | undefined, message: string, sound: TuiAttentionSoundName) {
   const session = sessionID ? api.state.session.get(sessionID) : undefined
   const isSubagent = session?.parentID !== undefined
+  const viewing = isViewingSession(api, sessionID)
   void api.attention.notify({
     title: session?.title,
     message,
     notification: isSubagent ? false : { when: "blurred" },
-    sound: { name: sound, when: "always" },
+    sound: viewing ? { name: sound, when: "blurred" } : { name: sound, when: "always" },
   })
 }
 

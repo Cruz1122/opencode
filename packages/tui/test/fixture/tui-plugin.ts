@@ -7,6 +7,7 @@ type Opts = {
   keymap?: TuiPluginApi["keymap"]
   attention?: Partial<TuiPluginApi["attention"]>
   event?: TuiPluginApi["event"]
+  route?: Partial<TuiPluginApi["route"]>
   state?: { session?: Partial<TuiPluginApi["state"]["session"]> }
 }
 
@@ -19,6 +20,7 @@ export function createTuiPluginApi(opts: Opts = {}) {
     client: opts.client,
     event: opts.event,
     keymap: opts.keymap,
+    route: { current: { name: "home" }, navigate: () => {}, ...opts.route },
     kv: {
       get(name: string, fallback?: unknown) {
         return values.has(name) ? values.get(name) : fallback

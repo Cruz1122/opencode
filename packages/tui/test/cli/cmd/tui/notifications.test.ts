@@ -98,7 +98,7 @@ const permissionNotification: TuiAttentionNotifyInput = {
 }
 
 describe("internal notifications TUI plugin", () => {
-  test("notifies for question and permission requests with blurred notifications and always-on sounds", async () => {
+  test("notifies for question and permission requests with blurred notifications and sounds", async () => {
     const harness = await setup()
 
     harness.emit({ id: "event-1", type: "question.asked", properties: question("question-1") })
@@ -261,6 +261,74 @@ describe("internal notifications TUI plugin", () => {
         message: "Model stopped responding",
         notification: { when: "blurred" },
         sound: { name: "error", when: "always" },
+      },
+    ])
+  })
+
+  test("suppresses sound while viewing the active session", async () => {
+    const notifications: TuiAttentionNotifyInput[] = []
+    const handlers = new Map<Event["type"], ((event: Event) => void)[]>()
+
+    await Notifications.tui(
+      createTuiPluginApi({
+        attention: {
+          async notify(input) {
+            notifications.push(input)
+            return { ok: true, notification: true, sound: true }
+          },
+        },
+        route: {
+          current: { name: "session", params: { sessionID: "session" } },
+        },
+        event: {
+          on: <Type extends Event["type"]>(type: Type, handler: (event: Extract<Event, { type: Type }>) => void) => {
+            const list = handlers.get(type) ?? []
+            const wrapped = handler as (event: Event) => void
+            list.push(wrapped)
+            handlers.set(type, list)
+            return () => {}
+          },
+        },
+        state: {
+          session: {
+            get: (sessionID: string) =>
+              sessionID === "session"
+                ? {
+                    id: "session",
+                    title: "Demo session",
+                    slug: "session",
+                    projectID: "project",
+                    directory: "/workspace",
+                    version: "0.0.0-test",
+                    time: { created: 0, updated: 0 },
+                  }
+                : undefined,
+          },
+        },
+      }),
+      undefined,
+      {} as never,
+    )
+
+    for (const handler of handlers.get("session.status") ?? []) {
+      handler({
+        id: "event-1",
+        type: "session.status",
+        properties: { sessionID: "session", status: { type: "busy" } },
+      })
+      handler({
+        id: "event-2",
+        type: "session.status",
+        properties: { sessionID: "session", status: { type: "idle" } },
+      })
+    }
+
+    expect(notifications).toEqual([
+      {
+        title: "Demo session",
+        message: "Session done",
+        notification: { when: "blurred" },
+        sound: { name: "done", when: "blurred" },
       },
     ])
   })

@@ -1,4 +1,4 @@
-import { Component, Show, createMemo, createResource, onMount } from "solid-js"
+import { Component, Show, createMemo, createResource, createSignal, onMount } from "solid-js"
 import { ButtonV2 } from "@opencode-ai/ui/v2/button-v2"
 import { SelectV2 } from "@opencode-ai/ui/v2/select-v2"
 import { Switch } from "@opencode-ai/ui/v2/switch-v2"
@@ -118,6 +118,39 @@ export const SettingsGeneralV2: Component = () => {
     permission.disableAutoAccept(params.id, value)
   }
   const desktop = createMemo(() => platform.platform === "desktop")
+  const [notificationPermission, setNotificationPermission] = createSignal(platform.notificationPermission())
+
+  onMount(() => {
+    setNotificationPermission(platform.notificationPermission())
+  })
+
+  const refreshNotificationPermission = async () => {
+    const next = await platform.requestNotificationPermission()
+    setNotificationPermission(next)
+    return next
+  }
+
+  const setNotificationEnabled = async (checked: boolean, setter: (value: boolean) => void) => {
+    if (!checked) {
+      setter(false)
+      return
+    }
+    const current = platform.notificationPermission()
+    setNotificationPermission(current)
+    if (current === "default") {
+      const next = await refreshNotificationPermission()
+      if (next !== "granted") return
+    }
+    if (current === "denied") return
+    setter(true)
+  }
+
+  const notificationPermissionDescription = createMemo(() => {
+    const state = notificationPermission()
+    if (state === "denied") return language.t("settings.general.notifications.permission.denied")
+    if (state === "unsupported") return language.t("settings.general.notifications.permission.unsupported")
+    return language.t("settings.general.notifications.permission.default")
+  })
 
   const themeOptions = createMemo<ThemeOption[]>(() => theme.ids().map((id) => ({ id, name: theme.name(id) })))
 
@@ -538,6 +571,19 @@ export const SettingsGeneralV2: Component = () => {
       <h3 class="settings-v2-section-title">{language.t("settings.general.section.notifications")}</h3>
 
       <SettingsListV2>
+        <Show when={notificationPermission() !== "granted"}>
+          <SettingsRowV2
+            title={language.t("settings.general.notifications.permission.title")}
+            description={notificationPermissionDescription()}
+          >
+            <Show when={notificationPermission() === "default"}>
+              <ButtonV2 size="normal" variant="neutral" onClick={() => void refreshNotificationPermission()}>
+                {language.t("settings.general.notifications.permission.request")}
+              </ButtonV2>
+            </Show>
+          </SettingsRowV2>
+        </Show>
+
         <SettingsRowV2
           title={language.t("settings.general.notifications.agent.title")}
           description={language.t("settings.general.notifications.agent.description")}
@@ -545,7 +591,7 @@ export const SettingsGeneralV2: Component = () => {
           <div data-action="settings-notifications-agent">
             <Switch
               checked={settings.notifications.agent()}
-              onChange={(checked) => settings.notifications.setAgent(checked)}
+              onChange={(checked) => void setNotificationEnabled(checked, settings.notifications.setAgent)}
             />
           </div>
         </SettingsRowV2>
@@ -557,7 +603,7 @@ export const SettingsGeneralV2: Component = () => {
           <div data-action="settings-notifications-permissions">
             <Switch
               checked={settings.notifications.permissions()}
-              onChange={(checked) => settings.notifications.setPermissions(checked)}
+              onChange={(checked) => void setNotificationEnabled(checked, settings.notifications.setPermissions)}
             />
           </div>
         </SettingsRowV2>
@@ -569,7 +615,7 @@ export const SettingsGeneralV2: Component = () => {
           <div data-action="settings-notifications-errors">
             <Switch
               checked={settings.notifications.errors()}
-              onChange={(checked) => settings.notifications.setErrors(checked)}
+              onChange={(checked) => void setNotificationEnabled(checked, settings.notifications.setErrors)}
             />
           </div>
         </SettingsRowV2>

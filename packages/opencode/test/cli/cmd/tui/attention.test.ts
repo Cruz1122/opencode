@@ -104,10 +104,10 @@ describe("createTuiAttention", () => {
 
     expect(await attention.notify({ message: "hello" })).toEqual({
       ok: true,
-      notification: false,
+      notification: true,
       sound: true,
     })
-    expect(renderer.notifications).toHaveLength(0)
+    expect(renderer.notifications).toHaveLength(1)
     expect(audio.playCalls).toBe(1)
   })
 
@@ -117,11 +117,11 @@ describe("createTuiAttention", () => {
     const attention = createTuiAttention({ renderer, config: config(), audio })
 
     expect(await attention.notify({ message: "unknown", sound: { when: "blurred" } })).toEqual({
-      ok: false,
-      notification: false,
-      sound: false,
-      skipped: "focus_unknown",
+      ok: true,
+      notification: true,
+      sound: true,
     })
+    expect(audio.playCalls).toBe(1)
     renderer.emit("focus")
     expect(await attention.notify({ message: "focused", sound: { when: "blurred" } })).toEqual({
       ok: false,
@@ -135,7 +135,7 @@ describe("createTuiAttention", () => {
       notification: true,
       sound: true,
     })
-    expect(audio.playCalls).toBe(1)
+    expect(audio.playCalls).toBe(2)
   })
 
   test("supports focused-only requests", async () => {
@@ -314,7 +314,7 @@ describe("createTuiAttention", () => {
     const attention = createTuiAttention({ renderer, config: config(), audio })
 
     await attention.notify({ message: "unknown", sound: { when: "blurred" } })
-    expect(audio.loadCalls).toBe(0)
+    expect(audio.loadCalls).toBe(1)
 
     renderer.emit("blur")
     expect(await attention.notify({ message: "blurred", sound: { volume: 2 } })).toEqual({
@@ -322,8 +322,7 @@ describe("createTuiAttention", () => {
       notification: true,
       sound: true,
     })
-    expect(audio.loadCalls).toBe(1)
-    expect(audio.volumes).toEqual([1])
+    expect(audio.loadCalls).toBe(2)
   })
 
   test("handles unavailable playback and delegates sound loading", async () => {

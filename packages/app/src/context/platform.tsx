@@ -18,6 +18,7 @@ type OpenAttachmentPickerOptions = {
 type SaveFilePickerOptions = { title?: string; defaultPath?: string }
 type PlatformName = "web" | "desktop"
 type DesktopOS = "macos" | "windows" | "linux"
+export type NotificationPermissionState = "default" | "granted" | "denied" | "unsupported"
 
 export type FatalRendererErrorLog = {
   error: string
@@ -48,6 +49,12 @@ type PlatformBase = {
 
   /** Send a system notification (optional deep link) */
   notify(title: string, description?: string, href?: string): Promise<void>
+
+  /** Current OS/browser notification permission */
+  notificationPermission(): NotificationPermissionState
+
+  /** Request OS/browser notification permission */
+  requestNotificationPermission(): Promise<NotificationPermissionState>
 
   /** Open a native attachment picker and read selected files sequentially (desktop only) */
   openAttachmentPickerDialog?(

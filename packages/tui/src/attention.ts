@@ -106,9 +106,20 @@ function normalizePack(pack: TuiAttentionSoundPack): RegisteredSoundPack | undef
 
 function focusSkip(when: TuiAttentionWhen, focus: FocusState) {
   if (when === "always") return
-  if (focus === "unknown") return "focus_unknown"
+  if (focus === "unknown") {
+    if (when === "blurred") return
+    return "focus_unknown"
+  }
   if (when === "blurred" && focus === "focused") return "focused"
   if (when === "focused" && focus === "blurred") return "blurred"
+}
+
+function sendLinuxNotification(title: string, message: string) {
+  if (process.platform !== "linux") return
+  Bun.spawn(["notify-send", title, message, "--app-name=opencode"], {
+    stdout: "ignore",
+    stderr: "ignore",
+  }).exited.catch(() => {})
 }
 
 export function createTuiAttention(input: {
@@ -182,12 +193,13 @@ export function createTuiAttention(input: {
         const notification = shouldNotify
           ? (() => {
               try {
-                return input.renderer.triggerNotification(
-                  message,
-                  normalizeText(request.title, DEFAULT_TITLE, TITLE_LIMIT),
-                )
+                const title = normalizeText(request.title, DEFAULT_TITLE, TITLE_LIMIT)
+                const delivered = input.renderer.triggerNotification(message, title)
+                if (!delivered) sendLinuxNotification(title, message)
+                return delivered
               } catch (error) {
                 console.debug("failed to trigger attention notification", { error })
+                sendLinuxNotification(normalizeText(request.title, DEFAULT_TITLE, TITLE_LIMIT), message)
                 return false
               }
             })()

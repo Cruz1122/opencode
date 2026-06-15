@@ -7,6 +7,8 @@ import { type Platform, PlatformProvider } from "@/context/platform"
 import { dict as en } from "@/i18n/en"
 import { dict as zh } from "@/i18n/zh"
 import { handleNotificationClick } from "@/utils/notification-click"
+import { isAppFocused } from "@/utils/attention"
+import { readNotificationPermission, requestNotificationPermission } from "@/utils/notification-permission"
 import { authFromToken } from "@/utils/server"
 import pkg from "../package.json"
 import { ServerConnection } from "./context/server"
@@ -55,17 +57,14 @@ const readDefaultServerUrl = () => getStorage(DEFAULT_SERVER_URL_KEY)
 const writeDefaultServerUrl = (url: string | null) => setStorage(DEFAULT_SERVER_URL_KEY, url)
 
 const notify: Platform["notify"] = async (title, description, href) => {
-  if (!("Notification" in window)) return
+  const permission = readNotificationPermission()
+  if (permission === "unsupported" || permission === "denied") return
+  if (permission === "default") {
+    const next = await requestNotificationPermission()
+    if (next !== "granted") return
+  }
 
-  const permission =
-    Notification.permission === "default"
-      ? await Notification.requestPermission().catch(() => "denied")
-      : Notification.permission
-
-  if (permission !== "granted") return
-
-  const inView = document.visibilityState === "visible" && document.hasFocus()
-  if (inView) return
+  if (isAppFocused()) return
 
   const notification = new Notification(title, {
     body: description ?? "",
@@ -127,6 +126,8 @@ const platform: Platform = {
   forward,
   restart,
   notify,
+  notificationPermission: readNotificationPermission,
+  requestNotificationPermission,
   getDefaultServer: async () => {
     const stored = readDefaultServerUrl()
     return stored ? ServerConnection.Key.make(stored) : null

@@ -12,6 +12,7 @@ import { base64Encode } from "@opencode-ai/core/util/encode"
 import { decode64 } from "@/utils/base64"
 import { EventSessionError } from "@opencode-ai/sdk/v2"
 import { Persist, persisted } from "@/utils/persist"
+import { shouldPlayAttentionSound } from "@/utils/attention"
 import { playSoundById } from "@/utils/sound"
 
 type NotificationBase = {
@@ -234,7 +235,15 @@ export const { use: useNotification, provider: NotificationProvider } = createSi
         if (!session) return
         if (session.parentID) return
 
-        if (settings.sounds.agentEnabled()) {
+        if (
+          settings.sounds.agentEnabled() &&
+          shouldPlayAttentionSound({
+            directory,
+            sessionID,
+            currentDirectory: currentDirectory(),
+            currentSession: currentSession(),
+          })
+        ) {
           void playSoundById(settings.sounds.agent())
         }
 
@@ -263,7 +272,16 @@ export const { use: useNotification, provider: NotificationProvider } = createSi
         if (meta.disposed) return
         if (session?.parentID) return
 
-        if (settings.sounds.errorsEnabled()) {
+        if (
+          settings.sounds.errorsEnabled() &&
+          shouldPlayAttentionSound({
+            directory,
+            sessionID,
+            parentID: session?.parentID,
+            currentDirectory: currentDirectory(),
+            currentSession: currentSession(),
+          })
+        ) {
           void playSoundById(settings.sounds.errors())
         }
 

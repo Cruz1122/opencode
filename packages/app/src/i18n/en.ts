@@ -924,6 +924,13 @@ export const dict = {
   "settings.general.notifications.permissions.description": "Show system notification when a permission is required",
   "settings.general.notifications.errors.title": "Errors",
   "settings.general.notifications.errors.description": "Show system notification when an error occurs",
+  "settings.general.notifications.permission.title": "System permission",
+  "settings.general.notifications.permission.default":
+    "Allow system notifications so alerts reach you when OpenCode is in the background",
+  "settings.general.notifications.permission.denied":
+    "System notifications are blocked. Enable them in your browser or operating system settings.",
+  "settings.general.notifications.permission.unsupported": "System notifications are not available in this environment",
+  "settings.general.notifications.permission.request": "Allow notifications",
 
   "settings.general.sounds.agent.title": "Agent",
   "settings.general.sounds.agent.description": "Play sound when the agent is complete or needs attention",
