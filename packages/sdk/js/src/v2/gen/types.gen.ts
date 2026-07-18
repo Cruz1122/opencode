@@ -79,6 +79,7 @@ export type Event =
   | EventMcpBrowserOpenFailed
   | EventCommandExecuted
   | EventProjectUpdated
+  | EventProviderUsage
   | EventSessionStatus
   | EventSessionIdle
   | EventQuestionAsked
@@ -668,6 +669,27 @@ export type Todo = {
    * Priority level of the task: high, medium, low
    */
   priority: string
+}
+
+export type ProviderUsageWindow = {
+  usedPercent: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+  windowMinutes?: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+  resetsAt?: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+}
+
+export type ProviderUsageCredits = {
+  hasCredits: boolean
+  unlimited: boolean
+  balance?: string
+}
+
+export type ProviderUsageSnapshot = {
+  providerID: string
+  primary?: ProviderUsageWindow
+  secondary?: ProviderUsageWindow
+  tertiary?: ProviderUsageWindow
+  credits?: ProviderUsageCredits
+  capturedAt: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
 }
 
 export type SessionStatus =
@@ -1492,6 +1514,14 @@ export type GlobalEvent = {
       }
     | {
         id: string
+        type: "provider.usage"
+        properties: {
+          providerID: string
+          usage: ProviderUsageSnapshot
+        }
+      }
+    | {
+        id: string
         type: "session.status"
         properties: {
           sessionID: string
@@ -1927,6 +1957,7 @@ export type Config = {
   enabled_providers?: Array<string>
   model?: string
   small_model?: string
+  subagent_model?: string
   default_agent?: string
   subagent_depth?: number
   username?: string
@@ -2793,6 +2824,33 @@ export type OutputFormat1 =
       retryCount?: number
     }
 
+export type ProviderUsageWindow3 = {
+  usedPercent: number | "NaN" | "Infinity" | "-Infinity"
+  windowMinutes?: number | "NaN" | "Infinity" | "-Infinity"
+  resetsAt?: number | "NaN" | "Infinity" | "-Infinity"
+}
+
+export type ProviderUsageWindow4 = {
+  usedPercent: number | "NaN" | "Infinity" | "-Infinity"
+  windowMinutes?: number | "NaN" | "Infinity" | "-Infinity"
+  resetsAt?: number | "NaN" | "Infinity" | "-Infinity"
+}
+
+export type ProviderUsageWindow5 = {
+  usedPercent: number | "NaN" | "Infinity" | "-Infinity"
+  windowMinutes?: number | "NaN" | "Infinity" | "-Infinity"
+  resetsAt?: number | "NaN" | "Infinity" | "-Infinity"
+}
+
+export type ProviderUsageSnapshot1 = {
+  providerID: string
+  primary?: ProviderUsageWindow3
+  secondary?: ProviderUsageWindow4
+  tertiary?: ProviderUsageWindow5
+  credits?: ProviderUsageCredits
+  capturedAt: number | "NaN" | "Infinity" | "-Infinity"
+}
+
 export type SessionStatus2 = {
   id: string
   metadata?: {
@@ -2923,6 +2981,7 @@ export type V2Event =
   | McpBrowserOpenFailed
   | CommandExecuted
   | ProjectUpdated
+  | ProviderUsage
   | SessionStatus2
   | SessionIdle
   | QuestionAsked
@@ -3010,6 +3069,33 @@ export type EventTuiSessionSelect2 = {
      */
     sessionID: string
   }
+}
+
+export type ProviderUsageWindow6 = {
+  usedPercent: number | "NaN" | "Infinity" | "-Infinity"
+  windowMinutes?: number | "NaN" | "Infinity" | "-Infinity"
+  resetsAt?: number | "NaN" | "Infinity" | "-Infinity"
+}
+
+export type ProviderUsageWindow7 = {
+  usedPercent: number | "NaN" | "Infinity" | "-Infinity"
+  windowMinutes?: number | "NaN" | "Infinity" | "-Infinity"
+  resetsAt?: number | "NaN" | "Infinity" | "-Infinity"
+}
+
+export type ProviderUsageWindow8 = {
+  usedPercent: number | "NaN" | "Infinity" | "-Infinity"
+  windowMinutes?: number | "NaN" | "Infinity" | "-Infinity"
+  resetsAt?: number | "NaN" | "Infinity" | "-Infinity"
+}
+
+export type ProviderUsageSnapshot2 = {
+  providerID: string
+  primary?: ProviderUsageWindow6
+  secondary?: ProviderUsageWindow7
+  tertiary?: ProviderUsageWindow8
+  credits?: ProviderUsageCredits
+  capturedAt: number | "NaN" | "Infinity" | "-Infinity"
 }
 
 export type CredentialValue = CredentialOAuth | CredentialKey
@@ -5906,6 +5992,24 @@ export type ProjectUpdated = {
   }
 }
 
+export type ProviderUsage = {
+  id: string
+  metadata?: {
+    [key: string]: unknown
+  }
+  type: "provider.usage"
+  durable?: {
+    aggregateID: string
+    seq: number
+    version: number
+  }
+  location?: LocationRef
+  data: {
+    providerID: string
+    usage: ProviderUsageSnapshot1
+  }
+}
+
 export type SessionIdle = {
   id: string
   metadata?: {
@@ -6921,6 +7025,15 @@ export type EventProjectUpdated = {
     commands?: ProjectCommands
     time: ProjectTime
     sandboxes: Array<string>
+  }
+}
+
+export type EventProviderUsage = {
+  id: string
+  type: "provider.usage"
+  properties: {
+    providerID: string
+    usage: ProviderUsageSnapshot2
   }
 }
 
@@ -9357,6 +9470,36 @@ export type ProviderAuthResponses = {
 }
 
 export type ProviderAuthResponse = ProviderAuthResponses[keyof ProviderAuthResponses]
+
+export type ProviderUsageData = {
+  body?: never
+  path: {
+    providerID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/provider/{providerID}/usage"
+}
+
+export type ProviderUsageErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type ProviderUsageError = ProviderUsageErrors[keyof ProviderUsageErrors]
+
+export type ProviderUsageResponses = {
+  /**
+   * Provider usage snapshot
+   */
+  200: ProviderUsageSnapshot
+}
+
+export type ProviderUsageResponse = ProviderUsageResponses[keyof ProviderUsageResponses]
 
 export type ProviderOauthAuthorizeData = {
   body?: {

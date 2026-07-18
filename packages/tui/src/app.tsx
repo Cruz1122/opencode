@@ -48,6 +48,7 @@ import { DialogDebug } from "./component/dialog-debug"
 import { DialogThemeList } from "./component/dialog-theme-list"
 import { DialogHelp } from "./ui/dialog-help"
 import { DialogAgent } from "./component/dialog-agent"
+import { DialogSubagentModel } from "./component/dialog-subagent-model"
 import { DialogSessionList } from "./component/dialog-session-list"
 import { DialogWorkspaceList } from "./component/dialog-workspace-list"
 import { DialogConsoleOrg } from "./component/dialog-console-org"
@@ -112,6 +113,7 @@ const appBindingCommands = [
   "model.cycle_favorite",
   "model.cycle_favorite_reverse",
   "agent.list",
+  "subagent.model",
   "mcp.list",
   "agent.cycle",
   "agent.cycle.reverse",
@@ -686,6 +688,15 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
         slashName: "agents",
         run: () => {
           dialog.replace(() => <DialogAgent />)
+        },
+      },
+      {
+        name: "subagent.model",
+        title: "Configure subagent models",
+        category: "Agent",
+        slashName: "subagents",
+        run: () => {
+          dialog.replace(() => <DialogSubagentModel />)
         },
       },
       {

@@ -1,10 +1,11 @@
-import { Match, Show, Switch, createMemo, type ComponentProps, type JSX } from "solid-js"
+import { Match, Show, Switch, createMemo, createSignal, onCleanup, onMount, type ComponentProps, type JSX } from "solid-js"
 import { ProgressCircle } from "@opencode-ai/ui/progress-circle"
 import { ProgressCircleV2 } from "@opencode-ai/ui/v2/progress-circle-v2"
 import { Button } from "@opencode-ai/ui/button"
 import { IconButtonV2 } from "@opencode-ai/ui/v2/icon-button-v2"
 import { TooltipV2 } from "@opencode-ai/ui/v2/tooltip-v2"
 import { createMediaQuery } from "@solid-primitives/media"
+import type { ProviderUsageSnapshot } from "@opencode-ai/sdk/v2"
 
 import { useFile } from "@/context/file"
 import { useLayout } from "@/context/layout"
@@ -12,10 +13,12 @@ import { useSync } from "@/context/sync"
 import { useLanguage } from "@/context/language"
 import { useProviders } from "@/hooks/use-providers"
 import { useSDK } from "@/context/sdk"
+import { usePrompt } from "@/context/prompt"
 import { getSessionContext } from "@/components/session/session-context-metrics"
 import { useSessionLayout } from "@/pages/session/session-layout"
 import { createSessionTabs } from "@/pages/session/helpers"
 import { useSettings } from "@/context/settings"
+import { formatProviderUsageWindow } from "@/utils/provider-usage"
 
 interface SessionContextUsageProps {
   variant?: "button" | "indicator"
@@ -49,6 +52,7 @@ export function SessionContextUsage(props: SessionContextUsageProps) {
   const layout = useLayout()
   const language = useLanguage()
   const sdk = useSDK()
+  const prompt = usePrompt()
   const settings = useSettings()
   const providers = useProviders(() => sdk().directory)
   const { params, tabs, view } = useSessionLayout()
@@ -64,6 +68,39 @@ export function SessionContextUsage(props: SessionContextUsageProps) {
   })
   const messages = createMemo(() => (params.id ? (sync().data.message[params.id] ?? []) : []))
   const info = createMemo(() => (params.id ? sync().session.get(params.id) : undefined))
+
+  const [providerUsageByID, setProviderUsageByID] = createSignal<Record<string, ProviderUsageSnapshot>>({})
+
+  const selectedProviderID = createMemo(() => prompt.model.current()?.providerID)
+
+  const providerUsage = createMemo(() => {
+    const providerID = selectedProviderID()
+    if (!providerID) return undefined
+    return providerUsageByID()[providerID]
+  })
+
+  onMount(() => {
+    const directorySdk = sdk()
+    const load = (providerID: string) =>
+      directorySdk.client.provider
+        .usage({ providerID })
+        .then((response) => {
+          if (!response.data) return
+          setProviderUsageByID((current) => ({ ...current, [providerID]: response.data! }))
+        })
+        .catch(() => undefined)
+
+    void load("openai")
+    void load("opencode-go")
+
+    const unsub = directorySdk.event.on("provider.usage", (event) => {
+      setProviderUsageByID((current) => ({
+        ...current,
+        [event.properties.providerID]: event.properties.usage,
+      }))
+    })
+    onCleanup(unsub)
+  })
 
   const usd = createMemo(
     () =>
@@ -125,14 +162,38 @@ export function SessionContextUsage(props: SessionContextUsageProps) {
     </div>
   )
 
+  const limitLabels = createMemo(() => {
+    if (selectedProviderID() === "opencode-go") {
+      return {
+        primary: language.t("context.usage.goPrimary"),
+        secondary: language.t("context.usage.goSecondary"),
+        tertiary: language.t("context.usage.goTertiary"),
+      }
+    }
+    return {
+      primary: language.t("context.usage.codexPrimary"),
+      secondary: language.t("context.usage.codexSecondary"),
+      tertiary: language.t("context.usage.codexSecondary"),
+    }
+  })
+
   const tooltipValue = () => (
-    <div class="flex w-[120px] flex-col gap-2">
+    <div class="flex w-[140px] flex-col gap-2">
       <ContextTooltipRow name={language.t("context.usage.cost")} value={cost()} />
       <ContextTooltipRow name={language.t("context.usage.usage")} value={`${context()?.usage ?? 0}%`} />
       <ContextTooltipRow
         name={language.t("context.usage.tokens")}
         value={context()?.total.toLocaleString(language.intl()) ?? "0"}
       />
+      <Show when={formatProviderUsageWindow(providerUsage()?.primary)}>
+        {(value) => <ContextTooltipRow name={limitLabels().primary} value={value()} />}
+      </Show>
+      <Show when={formatProviderUsageWindow(providerUsage()?.secondary)}>
+        {(value) => <ContextTooltipRow name={limitLabels().secondary} value={value()} />}
+      </Show>
+      <Show when={selectedProviderID() === "opencode-go" && formatProviderUsageWindow(providerUsage()?.tertiary)}>
+        {(value) => <ContextTooltipRow name={limitLabels().tertiary} value={value()} />}
+      </Show>
     </div>
   )
 

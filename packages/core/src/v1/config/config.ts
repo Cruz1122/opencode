@@ -77,6 +77,10 @@ export const Info = Schema.Struct({
   small_model: Schema.optional(Schema.String).annotate({
     description: "Small model to use for tasks like title generation in the format of provider/model",
   }),
+  subagent_model: Schema.optional(Schema.String).annotate({
+    description:
+      "Default model for all subagents in the format of provider/model. Used when a subagent has no per-agent model. Falls back to the parent session model.",
+  }),
   default_agent: Schema.optional(Schema.String).annotate({
     description:
       "Default agent to use when none is specified. Must be a primary agent. Falls back to 'build' if not set or if the specified agent is invalid.",

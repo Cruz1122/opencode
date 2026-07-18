@@ -255,6 +255,254 @@ describe("tool.task", () => {
     }),
   )
 
+  it.instance("execute inherits parent model when the subagent has none", () =>
+    Effect.gen(function* () {
+      const { chat, assistant } = yield* seed()
+      const tool = yield* TaskTool
+      const def = yield* tool.init()
+      let seen: SessionPrompt.PromptInput | undefined
+      const promptOps = stubOps({ onPrompt: (input) => (seen = input) })
+
+      const result = yield* def.execute(
+        {
+          description: "inspect bug",
+          prompt: "look into the cache key path",
+          subagent_type: "general",
+        },
+        {
+          sessionID: chat.id,
+          messageID: assistant.id,
+          agent: "build",
+          abort: new AbortController().signal,
+          extra: { promptOps },
+          messages: [],
+          metadata: () => Effect.void,
+          ask: () => Effect.void,
+        },
+      )
+
+      expect(result.metadata.model).toEqual(ref)
+      expect(seen?.model).toEqual(ref)
+      expect(seen?.variant).toBe("xhigh")
+    }),
+  )
+
+  it.instance(
+    "execute uses the subagent configured model",
+    () =>
+      Effect.gen(function* () {
+        const { chat, assistant } = yield* seed()
+        const tool = yield* TaskTool
+        const def = yield* tool.init()
+        let seen: SessionPrompt.PromptInput | undefined
+        const promptOps = stubOps({ onPrompt: (input) => (seen = input) })
+        const agentModel = {
+          providerID: ProviderV2.ID.make("anthropic"),
+          modelID: ModelV2.ID.make("claude-sonnet-4-6"),
+        }
+
+        const result = yield* def.execute(
+          {
+            description: "inspect bug",
+            prompt: "look into the cache key path",
+            subagent_type: "general",
+          },
+          {
+            sessionID: chat.id,
+            messageID: assistant.id,
+            agent: "build",
+            abort: new AbortController().signal,
+            extra: { promptOps },
+            messages: [],
+            metadata: () => Effect.void,
+            ask: () => Effect.void,
+          },
+        )
+
+        expect(result.metadata.model).toEqual(agentModel)
+        expect(seen?.model).toEqual(agentModel)
+        expect(seen?.variant).toBeUndefined()
+      }),
+    {
+      config: {
+        agent: {
+          general: {
+            model: "anthropic/claude-sonnet-4-6",
+          },
+        },
+      },
+    },
+  )
+
+  it.instance(
+    "execute uses config.subagent_model when the subagent has none",
+    () =>
+      Effect.gen(function* () {
+        const { chat, assistant } = yield* seed()
+        const tool = yield* TaskTool
+        const def = yield* tool.init()
+        let seen: SessionPrompt.PromptInput | undefined
+        const promptOps = stubOps({ onPrompt: (input) => (seen = input) })
+        const fallback = {
+          providerID: ProviderV2.ID.make("openai"),
+          modelID: ModelV2.ID.make("gpt-5-mini"),
+        }
+
+        const result = yield* def.execute(
+          {
+            description: "inspect bug",
+            prompt: "look into the cache key path",
+            subagent_type: "general",
+          },
+          {
+            sessionID: chat.id,
+            messageID: assistant.id,
+            agent: "build",
+            abort: new AbortController().signal,
+            extra: { promptOps },
+            messages: [],
+            metadata: () => Effect.void,
+            ask: () => Effect.void,
+          },
+        )
+
+        expect(result.metadata.model).toEqual(fallback)
+        expect(seen?.model).toEqual(fallback)
+        expect(seen?.variant).toBeUndefined()
+      }),
+    {
+      config: {
+        subagent_model: "openai/gpt-5-mini",
+      },
+    },
+  )
+
+  it.instance(
+    "execute prefers per-agent model over config.subagent_model",
+    () =>
+      Effect.gen(function* () {
+        const { chat, assistant } = yield* seed()
+        const tool = yield* TaskTool
+        const def = yield* tool.init()
+        let seen: SessionPrompt.PromptInput | undefined
+        const promptOps = stubOps({ onPrompt: (input) => (seen = input) })
+        const agentModel = {
+          providerID: ProviderV2.ID.make("anthropic"),
+          modelID: ModelV2.ID.make("claude-sonnet-4-6"),
+        }
+
+        const result = yield* def.execute(
+          {
+            description: "inspect bug",
+            prompt: "look into the cache key path",
+            subagent_type: "general",
+          },
+          {
+            sessionID: chat.id,
+            messageID: assistant.id,
+            agent: "build",
+            abort: new AbortController().signal,
+            extra: { promptOps },
+            messages: [],
+            metadata: () => Effect.void,
+            ask: () => Effect.void,
+          },
+        )
+
+        expect(result.metadata.model).toEqual(agentModel)
+        expect(seen?.model).toEqual(agentModel)
+      }),
+    {
+      config: {
+        subagent_model: "openai/gpt-5-mini",
+        agent: {
+          general: {
+            model: "anthropic/claude-sonnet-4-6",
+          },
+        },
+      },
+    },
+  )
+
+  it.instance(
+    "execute prefers params.model over agent and parent models",
+    () =>
+      Effect.gen(function* () {
+        const { chat, assistant } = yield* seed()
+        const tool = yield* TaskTool
+        const def = yield* tool.init()
+        let seen: SessionPrompt.PromptInput | undefined
+        const promptOps = stubOps({ onPrompt: (input) => (seen = input) })
+        const override = {
+          providerID: ProviderV2.ID.make("openai"),
+          modelID: ModelV2.ID.make("gpt-5"),
+        }
+
+        const result = yield* def.execute(
+          {
+            description: "inspect bug",
+            prompt: "look into the cache key path",
+            subagent_type: "general",
+            model: "openai/gpt-5",
+          },
+          {
+            sessionID: chat.id,
+            messageID: assistant.id,
+            agent: "build",
+            abort: new AbortController().signal,
+            extra: { promptOps },
+            messages: [],
+            metadata: () => Effect.void,
+            ask: () => Effect.void,
+          },
+        )
+
+        expect(result.metadata.model).toEqual(override)
+        expect(seen?.model).toEqual(override)
+        expect(seen?.variant).toBeUndefined()
+      }),
+    {
+      config: {
+        agent: {
+          general: {
+            model: "anthropic/claude-sonnet-4-6",
+          },
+        },
+      },
+    },
+  )
+
+  it.instance("execute rejects invalid params.model", () =>
+    Effect.gen(function* () {
+      const { chat, assistant } = yield* seed()
+      const tool = yield* TaskTool
+      const def = yield* tool.init()
+
+      const result = yield* def
+        .execute(
+          {
+            description: "inspect bug",
+            prompt: "look into the cache key path",
+            subagent_type: "general",
+            model: "not-a-valid-model",
+          },
+          {
+            sessionID: chat.id,
+            messageID: assistant.id,
+            agent: "build",
+            abort: new AbortController().signal,
+            extra: { promptOps: stubOps() },
+            messages: [],
+            metadata: () => Effect.void,
+            ask: () => Effect.void,
+          },
+        )
+        .pipe(Effect.exit)
+
+      expect(Exit.isFailure(result)).toBe(true)
+    }),
+  )
+
   it.instance("execute asks by default and skips checks when bypassed", () =>
     Effect.gen(function* () {
       const { chat, assistant } = yield* seed()

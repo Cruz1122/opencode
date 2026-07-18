@@ -6,6 +6,7 @@ import { setTimeout as sleep } from "node:timers/promises"
 import { createServer } from "http"
 import { OpenAIWebSocketPool } from "./ws-pool"
 import { OauthCallbackPage } from "@opencode-ai/core/oauth/page"
+import { maybeScheduleUsagePoll, updateFromHeaders } from "./codex-usage"
 
 const CLIENT_ID = "app_EMoamEEZ73f0CkXaXp7hrann"
 const ISSUER = "https://auth.openai.com"
@@ -330,6 +331,12 @@ export async function CodexAuthPlugin(input: PluginInput, options: CodexAuthPlug
         }
         if (auth.type !== "oauth") return websocketFetch ? { fetch: websocketFetch } : {}
 
+        const authWithAccount = auth as typeof auth & { accountId?: string }
+        maybeScheduleUsagePoll({
+          access: auth.access,
+          accountId: authWithAccount.accountId,
+        })
+
         let refreshPromise:
           | Promise<{
               access: string
@@ -386,6 +393,10 @@ export async function CodexAuthPlugin(input: PluginInput, options: CodexAuthPlug
               const refreshed = await refreshPromise
               currentAuth.access = refreshed.access
               authWithAccount.accountId = refreshed.accountId
+              maybeScheduleUsagePoll({
+                access: refreshed.access,
+                accountId: refreshed.accountId,
+              })
             }
 
             const headers = new Headers()
@@ -407,6 +418,11 @@ export async function CodexAuthPlugin(input: PluginInput, options: CodexAuthPlug
               headers.set("ChatGPT-Account-Id", authWithAccount.accountId)
             }
 
+            maybeScheduleUsagePoll({
+              access: currentAuth.access,
+              accountId: authWithAccount.accountId,
+            })
+
             const parsed =
               requestInput instanceof URL
                 ? requestInput
@@ -421,8 +437,14 @@ export async function CodexAuthPlugin(input: PluginInput, options: CodexAuthPlug
               body: init?.body,
               headers,
             }
-            if (websocketFetch && parsed.pathname.endsWith("/responses")) return websocketFetch(url, requestInit)
-            return fetch(url, OpenAIWebSocketPool.withoutInternalHeaders(requestInit))
+            if (websocketFetch && parsed.pathname.endsWith("/responses")) {
+              const response = await websocketFetch(url, requestInit)
+              updateFromHeaders(response.headers)
+              return response
+            }
+            const response = await fetch(url, OpenAIWebSocketPool.withoutInternalHeaders(requestInit))
+            updateFromHeaders(response.headers)
+            return response
           },
         }
       },

@@ -16,6 +16,7 @@ import type {
   SessionStatus,
   ProviderListResponse,
   ProviderAuthMethod,
+  ProviderUsageSnapshot,
   VcsInfo,
   SnapshotFileDiff,
   ConsoleState,
@@ -71,6 +72,9 @@ export const {
         experimentalBackgroundSubagents: boolean
       }
       provider_auth: Record<string, ProviderAuthMethod[]>
+      provider_usage: {
+        [providerID: string]: ProviderUsageSnapshot
+      }
       agent: Agent[]
       command: Command[]
       permission: {
@@ -116,6 +120,7 @@ export const {
         experimentalBackgroundSubagents: false,
       },
       provider_auth: {},
+      provider_usage: {},
       config: {},
       status: "loading",
       agent: [],
@@ -436,6 +441,11 @@ export const {
           }
           break
         }
+
+        case "provider.usage": {
+          setStore("provider_usage", event.properties.providerID, reconcile(event.properties.usage))
+          break
+        }
       }
     })
 
@@ -525,6 +535,18 @@ export const {
               setStore("session_status", reconcile(x.data ?? {}))
             }),
             sdk.client.provider.auth({ workspace }).then((x) => setStore("provider_auth", reconcile(x.data ?? {}))),
+            sdk.client.provider
+              .usage({ providerID: "openai", workspace })
+              .then((x) => {
+                if (x.data) setStore("provider_usage", "openai", reconcile(x.data))
+              })
+              .catch(() => undefined),
+            sdk.client.provider
+              .usage({ providerID: "opencode-go", workspace })
+              .then((x) => {
+                if (x.data) setStore("provider_usage", "opencode-go", reconcile(x.data))
+              })
+              .catch(() => undefined),
             sdk.client.vcs.get({ workspace }).then((x) => setStore("vcs", reconcile(x.data))),
             project.workspace.sync(),
           ]).then(() => {

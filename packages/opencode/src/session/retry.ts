@@ -4,6 +4,7 @@ import { Cause, Clock, Duration, Effect, Schedule } from "effect"
 import { MessageV2 } from "./message-v2"
 import { iife } from "@/util/iife"
 import { isRecord } from "@/util/record"
+import { applyLimitReached } from "@/provider/go-usage"
 
 export type Err = ReturnType<NamedError["toObject"]>
 
@@ -91,6 +92,9 @@ export function retryable(error: Err, provider: string) {
       const workspace = str(body?.metadata?.workspace)
       const limitName = str(body?.metadata?.limitName)
       const retryAfter = num(error.data.responseHeaders?.["retry-after"])
+      if (provider === "opencode-go" || provider === "opencode") {
+        applyLimitReached(limitName, retryAfter)
+      }
       const resetIn = iife(() => {
         if (retryAfter === undefined) return ""
         const seconds = Math.max(0, Math.ceil(retryAfter))

@@ -486,6 +486,11 @@ export const dict = {
   "context.usage.tokens": "Tokens",
   "context.usage.usage": "Usage",
   "context.usage.cost": "Cost",
+  "context.usage.codexPrimary": "Codex 5h",
+  "context.usage.codexSecondary": "Codex 7d",
+  "context.usage.goPrimary": "Go 5h",
+  "context.usage.goSecondary": "Go weekly",
+  "context.usage.goTertiary": "Go monthly",
   "context.usage.clickToView": "Click to view context",
   "context.usage.view": "View context usage",
 

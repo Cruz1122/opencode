@@ -10,6 +10,7 @@ import { Agent } from "../agent/agent"
 import { deriveSubagentSessionPermission } from "../agent/subagent-permissions"
 import type { SessionPrompt } from "../session/prompt"
 import { Config } from "@/config/config"
+import { Provider } from "@/provider/provider"
 import { Effect, Exit, Schema, Scope } from "effect"
 import { EffectBridge } from "@/effect/bridge"
 import { RuntimeFlags } from "@/effect/runtime-flags"
@@ -44,6 +45,10 @@ const BaseParameterFields = {
   description: Schema.String.annotate({ description: "A short (3-5 words) description of the task" }),
   prompt: Schema.String.annotate({ description: "The task for the agent to perform" }),
   subagent_type: Schema.String.annotate({ description: "The type of specialized agent to use for this task" }),
+  model: Schema.optional(Schema.String).annotate({
+    description:
+      "Model to use as provider/model (e.g. anthropic/claude-sonnet-4-6). Omit to use the subagent default or parent model.",
+  }),
   task_id: Schema.optional(Schema.String).annotate({
     description:
       "This should only be set if you mean to resume a previous task (you can pass a prior task_id and the task will continue the same subagent session as before instead of creating a fresh one)",
@@ -178,10 +183,20 @@ export const TaskTool = Tool.define(
       if (msg.info.role !== "assistant") return yield* Effect.fail(new Error("Not an assistant message"))
       const variant = msg.info.variant
 
-      const model = next.model ?? {
-        modelID: msg.info.modelID,
-        providerID: msg.info.providerID,
+      const override = params.model ? resolveTaskModel(params.model) : undefined
+      if (params.model && !override) {
+        return yield* Effect.fail(
+          new Error(`Invalid model "${params.model}". Use provider/model (e.g. anthropic/claude-sonnet-4-6).`),
+        )
       }
+      const fallback = cfg.subagent_model ? resolveTaskModel(cfg.subagent_model) : undefined
+      const model = override ??
+        next.model ??
+        fallback ?? {
+          modelID: msg.info.modelID,
+          providerID: msg.info.providerID,
+        }
+      const hasOwnModel = Boolean(override ?? next.model ?? fallback)
       const metadata = {
         parentSessionId: ctx.sessionID,
         sessionId: nextSession.id,
@@ -206,7 +221,7 @@ export const TaskTool = Tool.define(
             modelID: model.modelID,
             providerID: model.providerID,
           },
-          variant: next.model ? undefined : variant,
+          variant: hasOwnModel ? undefined : variant,
           agent: next.name,
           parts,
         })
@@ -358,3 +373,11 @@ export const TaskTool = Tool.define(
     }
   }),
 )
+
+function resolveTaskModel(value: string) {
+  const trimmed = value.trim()
+  if (!trimmed.includes("/")) return undefined
+  const parsed = Provider.parseModel(trimmed)
+  if (!parsed.providerID || !parsed.modelID) return undefined
+  return parsed
+}

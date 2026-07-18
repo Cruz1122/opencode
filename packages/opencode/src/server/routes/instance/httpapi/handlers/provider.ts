@@ -2,6 +2,10 @@ import { ProviderAuth } from "@/provider/auth"
 import { Config } from "@/config/config"
 import { ModelsDev } from "@opencode-ai/core/models-dev"
 import { Provider } from "@/provider/provider"
+import { getLatest as getCodexUsage } from "@/plugin/openai/codex-usage"
+import { getLatest as getGoUsage, refreshUsage as refreshGoUsage } from "@/provider/go-usage"
+import { Auth } from "@/auth"
+import { Env } from "@/env"
 
 import { mapValues } from "remeda"
 import { Effect, Schema } from "effect"
@@ -36,6 +40,8 @@ export const providerHandlers = HttpApiBuilder.group(InstanceHttpApi, "provider"
     const cfg = yield* Config.Service
     const provider = yield* Provider.Service
     const svc = yield* ProviderAuth.Service
+    const auth = yield* Auth.Service
+    const env = yield* Env.Service
 
     const list = Effect.fn("ProviderHttpApi.list")(function* () {
       const config = yield* cfg.get()
@@ -58,8 +64,29 @@ export const providerHandlers = HttpApiBuilder.group(InstanceHttpApi, "provider"
       }
     })
 
-    const auth = Effect.fn("ProviderHttpApi.auth")(function* () {
+    const authMethods = Effect.fn("ProviderHttpApi.auth")(function* () {
       return yield* svc.methods()
+    })
+
+    const resolveGoApiKey = Effect.fn("ProviderHttpApi.resolveGoApiKey")(function* () {
+      const connected = yield* provider.list()
+      const fromProvider = connected[ProviderV2.ID.opencodeGo]?.key ?? connected[ProviderV2.ID.opencode]?.key
+      if (fromProvider) return fromProvider
+      const stored = yield* auth.get(ProviderV2.ID.opencodeGo).pipe(Effect.orDie)
+      if (stored?.type === "api" && stored.key) return stored.key
+      const shared = yield* auth.get(ProviderV2.ID.opencode).pipe(Effect.orDie)
+      if (shared?.type === "api" && shared.key) return shared.key
+      return yield* env.get("OPENCODE_API_KEY")
+    })
+
+    const usage = Effect.fn("ProviderHttpApi.usage")(function* (ctx: { params: { providerID: ProviderV2.ID } }) {
+      if (ctx.params.providerID === ProviderV2.ID.openai) return getCodexUsage() ?? null
+      if (ctx.params.providerID === ProviderV2.ID.opencodeGo) {
+        const apiKey = yield* resolveGoApiKey()
+        if (!apiKey) return getGoUsage() ?? null
+        return (yield* Effect.promise(() => refreshGoUsage(apiKey, { force: true }))) ?? null
+      }
+      return null
     })
 
     const authorize = Effect.fn("ProviderHttpApi.authorize")(function* (ctx: {
@@ -106,7 +133,8 @@ export const providerHandlers = HttpApiBuilder.group(InstanceHttpApi, "provider"
 
     return handlers
       .handle("list", list)
-      .handle("auth", auth)
+      .handle("auth", authMethods)
+      .handle("usage", usage)
       .handleRaw("authorize", authorizeRaw)
       .handle("callback", callback)
   }),

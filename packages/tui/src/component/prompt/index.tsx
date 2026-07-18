@@ -40,6 +40,7 @@ import { type AutocompleteRef, Autocomplete } from "./autocomplete"
 import { useRenderer, useTerminalDimensions, type JSX } from "@opentui/solid"
 import type { AssistantMessage, FilePart, UserMessage } from "@opencode-ai/sdk/v2"
 import { Locale } from "../../util/locale"
+import { formatProviderUsage } from "../../util/provider-usage"
 import { errorMessage } from "../../util/error"
 import { formatDuration } from "../../util/format"
 import { createColors, createFrames } from "../../ui/spinner"
@@ -276,11 +277,36 @@ export function Prompt(props: PromptProps) {
     const model = sync.data.provider.find((item) => item.id === last.providerID)?.models[last.modelID]
     const pct = model?.limit.context ? `${Math.round((tokens / model.limit.context) * 100)}%` : undefined
     const cost = session?.cost ?? 0
+    const selectedProviderID = local.model.current()?.providerID ?? last.providerID
+    const providerLimit = formatProviderUsage(sync.data.provider_usage[selectedProviderID])
     return {
       context: pct ? `${Locale.number(tokens)} (${pct})` : Locale.number(tokens),
       cost: cost > 0 ? money.format(cost) : undefined,
+      providerLimit,
     }
   })
+
+  const providerLimit = createMemo(() => {
+    const providerID = local.model.current()?.providerID
+    if (!providerID) return
+    return formatProviderUsage(sync.data.provider_usage[providerID])
+  })
+
+  createEffect(
+    on(
+      () => local.model.current()?.providerID,
+      (providerID) => {
+        if (providerID !== "opencode-go" && providerID !== "openai") return
+        const workspace = project.workspace.current()
+        void sdk.client.provider
+          .usage({ providerID, workspace })
+          .then((x) => {
+            if (x.data) sync.set("provider_usage", providerID, x.data)
+          })
+          .catch(() => undefined)
+      },
+    ),
+  )
 
   const [store, setStore] = createStore<{
     prompt: PromptInfo
@@ -1684,7 +1710,14 @@ export function Prompt(props: PromptProps) {
                     <Match when={usage()}>
                       {(item) => (
                         <text fg={theme.textMuted} wrapMode="none">
-                          {[item().context, item().cost].filter(Boolean).join(" · ")}
+                          {[item().context, item().providerLimit, item().cost].filter(Boolean).join(" · ")}
+                        </text>
+                      )}
+                    </Match>
+                    <Match when={providerLimit()}>
+                      {(limit) => (
+                        <text fg={theme.textMuted} wrapMode="none">
+                          {limit()}
                         </text>
                       )}
                     </Match>
