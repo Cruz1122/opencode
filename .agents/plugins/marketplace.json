@@ -1,0 +1,20 @@
+{
+  "name": "opencode-delta",
+  "interface": {
+    "displayName": "OpenCode Delta"
+  },
+  "plugins": [
+    {
+      "name": "opencode-delta",
+      "source": {
+        "source": "local",
+        "path": "./plugins/opencode-delta"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_USE"
+      },
+      "category": "Developer Tools"
+    }
+  ]
+}

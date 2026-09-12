@@ -1,0 +1,30 @@
+{
+  "description": "Risk-based OpenCode Delta quality gate. Balanced by default; strict also reviews normal changes.",
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "^(apply_patch|Edit|Write)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$PLUGIN_ROOT/hooks/quality_gate.py\"",
+            "timeout": 10,
+            "statusMessage": "Tracking changed files"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$PLUGIN_ROOT/hooks/quality_gate.py\"",
+            "timeout": 10,
+            "statusMessage": "Evaluating quality review"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "name": "opencode-delta",
+  "version": "1.0.0",
+  "description": "Shared engineering skills and workflow quality gate for the OpenCode Delta suite.",
+  "author": {
+    "name": "Cruz1122",
+    "url": "https://github.com/Cruz1122"
+  },
+  "homepage": "https://github.com/Cruz1122/opencode",
+  "repository": "https://github.com/Cruz1122/opencode",
+  "license": "MIT",
+  "keywords": [
+    "engineering",
+    "quality",
+    "skills",
+    "codex",
+    "opencode"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "OpenCode Delta",
+    "shortDescription": "Engineering skills and risk-based quality review.",
+    "longDescription": "Shared engineering skills plus a Codex-native quality gate adapted from the OpenCode Delta workflow.",
+    "developerName": "Cruz1122",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Write"
+    ],
+    "websiteURL": "https://github.com/Cruz1122/opencode",
+    "defaultPrompt": [
+      "Review this implementation with OpenCode Delta quality rules.",
+      "Map this repository before changing it.",
+      "Implement this change with proportional verification."
+    ]
+  }
+}

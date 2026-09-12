@@ -1,0 +1,6 @@
+brain/private/**
+brain/**/secrets/**
+**/.env
+**/.env.*
+**/*credentials*
+**/*secret*

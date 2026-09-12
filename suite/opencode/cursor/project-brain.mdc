@@ -1,0 +1,15 @@
+---
+description: Navigate the local project brain without treating candidates as truth
+alwaysApply: true
+---
+
+When `brain/` exists, start project-knowledge retrieval at `brain/00-home.md`. Retrieve only notes relevant to the current question.
+
+Authority order:
+1. Executable code, tests, schemas, and configuration.
+2. Accepted decisions and verified documentation.
+3. Verified operational memory and incidents.
+4. Inferred notes.
+5. Candidates.
+
+Report contradictions and potentially outdated documentation. Do not use `brain/private/`. Do not treat candidate or inferred content as verified.
