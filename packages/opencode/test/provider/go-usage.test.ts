@@ -12,9 +12,12 @@ import {
   USAGE_POLL_MIN_INTERVAL_MS,
 } from "../../src/provider/go-usage"
 
+const originalFetch = globalThis.fetch
+
 afterEach(() => {
   clear()
   mock.restore()
+  globalThis.fetch = originalFetch
 })
 
 describe("go-usage", () => {
