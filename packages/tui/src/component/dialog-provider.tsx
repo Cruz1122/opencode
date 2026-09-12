@@ -91,6 +91,10 @@ export function createDialogProviderOptions() {
   const { theme } = useTheme()
   const onboarded = useConnected()
 
+  const providerCatalog = createMemo(() =>
+    sync.data.provider_next.all.length ? sync.data.provider_next.all : sync.data.provider,
+  )
+
   async function promptCustomProviderID(): Promise<string | undefined> {
     const value = await DialogPrompt.show(dialog, "Other", {
       placeholder: "Provider id",
@@ -115,7 +119,7 @@ export function createDialogProviderOptions() {
 
   const options = createMemo(() => {
     return pipe(
-      providerOptions(sync.data.provider_next.all),
+      providerOptions(providerCatalog()),
       map((provider) => {
         if (provider.type === "custom") {
           return {
@@ -133,7 +137,9 @@ export function createDialogProviderOptions() {
 
         const providerID = provider.providerID
         const consoleManaged = isConsoleManagedProvider(sync.data.console_state.consoleManagedProviders, providerID)
-        const connected = sync.data.provider_next.connected.includes(providerID)
+        const connected =
+          sync.data.provider_next.connected.includes(providerID) ||
+          (!sync.data.provider_next.all.length && sync.data.provider.some((item) => item.id === providerID))
 
         return {
           title: provider.title,
@@ -360,6 +366,9 @@ function ApiMethod(props: ApiMethodProps) {
   const sdk = useSDK()
   const sync = useSync()
   const toast = useToast()
+  const providerCatalog = createMemo(() =>
+    sync.data.provider_next.all.length ? sync.data.provider_next.all : sync.data.provider,
+  )
   const { theme } = useTheme()
 
   return (
@@ -404,7 +413,7 @@ function ApiMethod(props: ApiMethodProps) {
         })
         await sdk.client.instance.dispose()
         await sync.bootstrap()
-        if (props.custom && !sync.data.provider_next.all.some((provider) => provider.id === props.providerID)) {
+        if (props.custom && !providerCatalog().some((provider) => provider.id === props.providerID)) {
           toast.show({
             variant: "info",
             message: `Saved credential for ${props.providerID}. Configure it in opencode.json to use it.`,

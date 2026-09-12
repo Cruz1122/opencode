@@ -21,7 +21,8 @@ export function DialogModel(props: {
   const [query, setQuery] = createSignal("")
 
   const connected = useConnected()
-  const providers = createDialogProviderOptions()
+  const providerOptions = createDialogProviderOptions()
+  const modelProviders = createMemo(() => (sync.data.provider.length ? sync.data.provider : sync.data.provider_next.all))
 
   const showExtra = createMemo(() => connected() && !props.providerID)
 
@@ -34,7 +35,7 @@ export function DialogModel(props: {
     function toOptions(items: typeof favorites, category: string) {
       if (!showSections) return []
       return items.flatMap((item) => {
-        const provider = sync.data.provider.find((provider) => provider.id === item.providerID)
+        const provider = modelProviders().find((provider) => provider.id === item.providerID)
         if (!provider) return []
         const model = provider.models[item.modelID]
         if (!model) return []
@@ -63,8 +64,8 @@ export function DialogModel(props: {
       "Recent",
     )
 
-    const providerOptions = pipe(
-      sync.data.provider,
+    const modelOptions = pipe(
+      modelProviders(),
       sortBy(
         (provider) => provider.id !== "opencode",
         (provider) => provider.name,
@@ -112,7 +113,7 @@ export function DialogModel(props: {
 
     const popularProviders = !connected()
       ? pipe(
-          providers(),
+          providerOptions(),
           map((option) => ({
             ...option,
             category: "Popular providers",
@@ -124,18 +125,18 @@ export function DialogModel(props: {
     if (needle) {
       return [
         ...sortModelOptions(
-          fuzzysort.go(needle, providerOptions, { keys: ["title", "category"] }).map((x) => x.obj),
+          fuzzysort.go(needle, modelOptions, { keys: ["title", "category"] }).map((x) => x.obj),
           false,
         ),
         ...fuzzysort.go(needle, popularProviders, { keys: ["title"] }).map((x) => x.obj),
       ]
     }
 
-    return [...favoriteOptions, ...recentOptions, ...providerOptions, ...popularProviders]
+    return [...favoriteOptions, ...recentOptions, ...modelOptions, ...popularProviders]
   })
 
   const provider = createMemo(() =>
-    props.providerID ? sync.data.provider.find((item) => item.id === props.providerID) : null,
+    props.providerID ? modelProviders().find((item) => item.id === props.providerID) : null,
   )
 
   const title = createMemo(() => {
