@@ -40,7 +40,7 @@ export const providerHandlers = HttpApiBuilder.group(InstanceHttpApi, "provider"
     const cfg = yield* Config.Service
     const provider = yield* Provider.Service
     const svc = yield* ProviderAuth.Service
-    const auth = yield* Auth.Service
+    const authStore = yield* Auth.Service
     const env = yield* Env.Service
 
     const list = Effect.fn("ProviderHttpApi.list")(function* () {
@@ -53,6 +53,7 @@ export const providerHandlers = HttpApiBuilder.group(InstanceHttpApi, "provider"
         if ((enabled ? enabled.has(key) : true) && !disabled.has(key)) filtered[key] = value
       }
       const connected = yield* provider.list()
+      const credentials = yield* authStore.all().pipe(Effect.orDie)
       const providers = Object.assign(
         mapValues(filtered, (item) => Provider.fromModelsDevProvider(item)),
         connected,
@@ -60,7 +61,7 @@ export const providerHandlers = HttpApiBuilder.group(InstanceHttpApi, "provider"
       return {
         all: Object.values(providers).map(Provider.toPublicInfo),
         default: Provider.defaultModelIDs(providers),
-        connected: Object.keys(connected),
+        connected: Object.keys(providers).filter((id) => id in connected || credentials[id]),
       }
     })
 
@@ -72,9 +73,9 @@ export const providerHandlers = HttpApiBuilder.group(InstanceHttpApi, "provider"
       const connected = yield* provider.list()
       const fromProvider = connected[ProviderV2.ID.opencodeGo]?.key ?? connected[ProviderV2.ID.opencode]?.key
       if (fromProvider) return fromProvider
-      const stored = yield* auth.get(ProviderV2.ID.opencodeGo).pipe(Effect.orDie)
+      const stored = yield* authStore.get(ProviderV2.ID.opencodeGo).pipe(Effect.orDie)
       if (stored?.type === "api" && stored.key) return stored.key
-      const shared = yield* auth.get(ProviderV2.ID.opencode).pipe(Effect.orDie)
+      const shared = yield* authStore.get(ProviderV2.ID.opencode).pipe(Effect.orDie)
       if (shared?.type === "api" && shared.key) return shared.key
       return yield* env.get("OPENCODE_API_KEY")
     })
@@ -84,7 +85,11 @@ export const providerHandlers = HttpApiBuilder.group(InstanceHttpApi, "provider"
       if (ctx.params.providerID === ProviderV2.ID.opencodeGo) {
         const apiKey = yield* resolveGoApiKey()
         if (!apiKey) return getGoUsage() ?? null
-        return (yield* Effect.promise(() => refreshGoUsage(apiKey, { force: true }))) ?? null
+        return (
+          (yield* Effect.promise(() => refreshGoUsage(apiKey, { force: true })).pipe(
+            Effect.catch(() => Effect.succeed(getGoUsage() ?? null)),
+          )) ?? null
+        )
       }
       return null
     })
